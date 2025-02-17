@@ -1,103 +1,112 @@
 import numpy as np
 
-def neville_interpolation(x_points, y_points, x):
-    n = len(x_points)
+# Problem 1: Neville's Method
+def neville_method(x_values, y_values, x):
+    n = len(x_values)
     Q = np.zeros((n, n))
-    Q[:, 0] = y_points
+    Q[:, 0] = y_values
 
     for i in range(1, n):
         for j in range(n - i):
-            Q[j, i] = ((x - x_points[j + i]) * Q[j, i - 1] - (x - x_points[j]) * Q[j + 1, i - 1]) / (x_points[j] - x_points[j + i])
-    
-    return Q[0, n - 1]
+            Q[j, i] = ((x - x_values[j + i]) * Q[j, i - 1] + (x_values[j] - x) * Q[j + 1, i - 1]) / (x_values[j] - x_values[j + i])
 
-def newton_forward_interpolation(x_points, y_points):
-    n = len(x_points)
+    return Q[0, -1]
+
+# Problem 2: Newton’s Forward Difference Table
+def newton_forward_table(x_values, y_values):
+    n = len(x_values)
     diff_table = np.zeros((n, n))
-    diff_table[:, 0] = y_points
+    diff_table[:, 0] = y_values
 
-    for j in range(1, n):
-        for i in range(n - j):
-            diff_table[i, j] = (diff_table[i + 1, j - 1] - diff_table[i, j - 1]) / (x_points[i + j] - x_points[i])
+    for i in range(1, n):
+        for j in range(n - i):
+            diff_table[j, i] = diff_table[j + 1, i - 1] - diff_table[j, i - 1]
 
     return diff_table
 
-def newton_forward_eval(diff_table, x_points, x):
-    n = len(x_points)
-    approx = diff_table[0, 0]
-    term = 1.0
+# Problem 3: Newton's Forward Interpolation
+def newton_forward_interpolation(x_values, y_values, x):
+    n = len(x_values)
+    diff_table = newton_forward_table(x_values, y_values)
+    h = x_values[1] - x_values[0]
+    p = (x - x_values[0]) / h
+
+    result = y_values[0]
+    factorial = 1
+    term = 1
 
     for i in range(1, n):
-        term *= (x - x_points[i - 1])
-        approx += term * diff_table[0, i]
+        factorial *= i
+        term *= (p - (i - 1))
+        result += (term * diff_table[0, i]) / factorial
 
-    return approx
+    return result
 
-def hermite_interpolation(x_points, y_points, y_derivatives):
-    n = len(x_points) * 2
-    H = np.zeros((n, n))
-    Q = np.zeros((n, n))
-    z = np.zeros(n)
-    f = np.zeros(n)
+# Problem 4: Hermite Interpolation
+def hermite_interpolation(x_values, y_values, y_derivatives):
+    n = len(x_values)
+    size = 2 * n
+    H = np.zeros((size, size))
 
-    for i in range(len(x_points)):
-        z[2 * i] = z[2 * i + 1] = x_points[i]
-        f[2 * i] = f[2 * i + 1] = y_points[i]
-        Q[2 * i, 0] = Q[2 * i + 1, 0] = y_points[i]
+    z = np.zeros(size)
+    Q = np.zeros((size, size))
+
+    for i in range(n):
+        z[2 * i] = x_values[i]
+        z[2 * i + 1] = x_values[i]
+        Q[2 * i, 0] = y_values[i]
+        Q[2 * i + 1, 0] = y_values[i]
         Q[2 * i + 1, 1] = y_derivatives[i]
+
         if i != 0:
             Q[2 * i, 1] = (Q[2 * i, 0] - Q[2 * i - 1, 0]) / (z[2 * i] - z[2 * i - 1])
 
-    for j in range(2, n):
-        for i in range(n - j):
-            Q[i, j] = (Q[i + 1, j - 1] - Q[i, j - 1]) / (z[i + j] - z[i])
+    for i in range(2, size):
+        for j in range(2, i + 1):
+            Q[i, j] = (Q[i, j - 1] - Q[i - 1, j - 1]) / (z[i] - z[i - j])
 
     return Q
 
-def cubic_spline_interpolation(x_points, y_points):
-    n = len(x_points)
-    h = np.diff(x_points)
-    b = (np.diff(y_points) / h)
-    
+# Problem 5: Cubic Spline Interpolation
+def cubic_spline_matrix(x_values, y_values):
+    n = len(x_values)
     A = np.zeros((n, n))
-    rhs = np.zeros(n)
-    
-    A[0, 0] = 1
-    A[-1, -1] = 1
+    b = np.zeros(n)
 
     for i in range(1, n - 1):
-        A[i, i - 1] = h[i - 1]
-        A[i, i] = 2 * (h[i - 1] + h[i])
-        A[i, i + 1] = h[i]
-        rhs[i] = 3 * (b[i] - b[i - 1])
+        A[i, i - 1] = x_values[i] - x_values[i - 1]
+        A[i, i] = 2 * (x_values[i + 1] - x_values[i - 1])
+        A[i, i + 1] = x_values[i + 1] - x_values[i]
+        b[i] = 3 * ((y_values[i + 1] - y_values[i]) / (x_values[i + 1] - x_values[i]) -
+                    (y_values[i] - y_values[i - 1]) / (x_values[i] - x_values[i - 1]))
 
-    coeffs = np.linalg.solve(A, rhs)
-    return A, rhs, coeffs
+    A[0, 0] = A[-1, -1] = 1
+
+    return A, b
 
 if __name__ == "__main__":
-    # Question 1
-    x_points = np.array([3.6, 3.8, 3.9])
-    y_points = np.array([1.675, 1.436, 1.318])
-    print(neville_interpolation(x_points, y_points, 3.7))
+    # Problem 1
+    x_vals = [3.6, 3.8, 3.9]
+    y_vals = [1.675, 1.436, 1.318]
+    print(neville_method(x_vals, y_vals, 3.7))
 
-    # Question 2 & 3
-    x_points = np.array([7.2, 7.4, 7.5, 7.6])
-    y_points = np.array([23.5492, 25.3913, 26.8224, 27.4589])
-    diff_table = newton_forward_interpolation(x_points, y_points)
-    print(diff_table)
+    # Problem 2
+    x_vals = [7.2, 7.4, 7.5, 7.6]
+    y_vals = [23.5492, 25.3913, 26.8224, 27.4589]
+    print(newton_forward_table(x_vals, y_vals))
 
-    print(newton_forward_eval(diff_table, x_points, 7.3))
+    # Problem 3
+    print(newton_forward_interpolation(x_vals, y_vals, 7.3))
 
-    # Question 4
-    x_points = np.array([3.6, 3.8, 3.9])
-    y_points = np.array([1.675, 1.436, 1.318])
-    y_derivatives = np.array([-1.195, -1.188, -1.182])
-    print(hermite_interpolation(x_points, y_points, y_derivatives))
+    # Problem 4
+    x_vals = [3.6, 3.8, 3.9]
+    y_vals = [1.675, 1.436, 1.318]
+    y_derivs = [-1.195, -1.188, -1.182]
+    print(hermite_interpolation(x_vals, y_vals, y_derivs))
 
-    # Question 5
-    x_points = np.array([2, 5, 8, 10])
-    y_points = np.array([3, 5, 7, 9])
-    A, b, x = cubic_spline_interpolation(x_points, y_points)
+    # Problem 5
+    x_vals = [2, 5, 8, 10]
+    y_vals = [3, 5, 7, 9]
+    A, b = cubic_spline_matrix(x_vals, y_vals)
     print(A)
     print(b)
-    print(x)
